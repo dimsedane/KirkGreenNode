@@ -9,94 +9,101 @@ String.prototype.hashCode = function(){
 	return hash;
 }
 
-function updateOrders(){
-    $.getJSON('/order/getOrders')
-        .success(function(data){
-            var tabs = "";
-            var tabsContent = "";
-            
-            data.forEach(function(order){
-                var date = new Date(order.date);
-                    
-                tabs += "<li><a href=\"#" + order.date + "\" data-toggle=\"tab\">" + date.getDate() + "/" + date.getMonth() + "</a></li>"; 
-                        
-                order.orderItems.sort(function(item1,item2){
-                    if(item1.type === item2.type){
-                        return (item1.customer === item2.customer) ? 0 : ((item1.customer > item2.customer) ? 1 : -1);
-                    } else {
-                        return (item1.type > item2.type) ? 1 : -1;
-                    }
-                });
-                        
-                tabsContent += '<div class="tab-pane" id="'+order.date+'">'; 
-                        
-                        
-                //Lets add a header
-                tabsContent += '<h2>Bestillinger for ' + date.getDate() + '/' + date.getMonth() +'</h2>';
-                        
-                //Then the table
-                tabsContent += '<table class="table table-striped">';
-                        
-                //Add a header row
-                tabsContent += '<thead><tr><th></th>';
-                        
-                var addedCustomers = [];
-                        
-                order.orderItems.forEach(function(orderItem){
-                    if($.inArray(orderItem.customer,addedCustomers) === -1){
-                        tabsContent += '<th>' + orderItem.customer + '</th>';
-                        addedCustomers.push(orderItem.customer);
-                    }
-                });
-                        
-                tabsContent += '</tr></thead>';
-                        
-                        
-                //Then the actual rows
-                var currentType = "";
-                var addCloseRowTag = false;
-                        
-                order.orderItems.forEach(function(orderitem){
-                    if(currentType != orderitem.type){
-                        if(addCloseRowTag) {
-                            tabsContent += '</tr>';
-                            addCloseRowTag = false;
-                        }
-                        tabsContent += '<tr><th>'+orderitem.type+'</th>';
-                    }
-                            
-                    tabsContent += '<td><input min="0" id="orderItemSpinner'+ order._id + orderitem.customer.replace(/\s/g,'') + orderitem.type.replace(/\s/g,'') +'" type="number" value="' + orderitem.amount + '"/></td>';
-                            
-                    updateOrderItem(orderitem,order._id);                
-                            
-                    if(currentType != orderitem.type){
-                        currentType = orderitem.type;
-                        addCloseRowTag = true;
-                    }
-                });
-                        
-                tabsContent += '</table></div>';                        
-            });
-       
-            tabs += "<li><a href=\"#add\" data-toggle=\"tab\">Tilføj</a></li>";
-            tabs += "<li class='active'><a href=\"#total\" data-toggle=\"tab\">Total</a></li>"; 
-                    
-                    
-            //Create add tab
-            //createAddTab(tabs,data);
-                    
-            //Create total tab
-            tabsContent += createTotalTab(data);
-       
-            $("#tabs-container").html(tabs);
-            $("#tab-content").html(tabsContent);
-                    
-       
-        })
-        .error(function(jqXHR, textStatus, errorThrown){
-            alert(textStatus);
-        });
+function compare(item1,item2){
+    if(item1.type === item2.type){
+        return (item1.customer === item2.customer) ? 0 : ((item1.customer > item2.customer) ? 1 : -1);
+    } else {
+        return (item1.type > item2.type) ? 1 : -1;
+    }
 }
+
+var socket = io.connect('http://localhost');
+socket.emit('updateOrders',{'season':'2013'});
+
+socket.on('orders',function(data){
+    var tabs = "";
+    var tabsContent = "";
+            
+    data.forEach(function(order){
+        var date = new Date(order.date);
+                    
+        tabs += "<li><a href=\"#" + order.date + "\" data-toggle=\"tab\">" + date.getDate() + "/" + date.getMonth() + "</a></li>"; 
+                        
+        order.orderItems.sort(compare);
+                        
+        tabsContent += '<div class="tab-pane" id="'+order.date+'">';
+                        
+        //Lets add a header
+        tabsContent += '<h2>Bestillinger for ' + date.getDate() + '/' + date.getMonth() +'</h2>';
+                        
+        //Then the table
+        tabsContent += '<table class="table table-striped">';
+                        
+        //Add a header row
+        tabsContent += '<thead><tr><th></th>';
+                        
+        var addedCustomers = [];
+                        
+        order.orderItems.forEach(function(orderItem){
+            if($.inArray(orderItem.customer,addedCustomers) === -1){
+                tabsContent += '<th>' + orderItem.customer + '</th>';
+                addedCustomers.push(orderItem.customer);
+            }
+        });
+                        
+        tabsContent += '</tr></thead>';
+                        
+                        
+        //Then the actual rows
+        var currentType = "";
+        var addCloseRowTag = false;
+                        
+        order.orderItems.forEach(function(orderitem){
+            if(currentType != orderitem.type){
+                if(addCloseRowTag) {
+                    tabsContent += '</tr>';
+                        addCloseRowTag = false;
+                    }
+                tabsContent += '<tr><th>'+orderitem.type+'</th>';
+            }
+                            
+            tabsContent += '<td><input min="0" id="orderItemSpinner'+ order._id + orderitem.customer.replace(/\s/g,'') + orderitem.type.replace(/\s/g,'') +'" type="number" value="' + orderitem.amount + '"/></td>';
+                            
+            updateOrderItem(orderitem,order._id);                
+                            
+            if(currentType != orderitem.type){
+                currentType = orderitem.type;
+                addCloseRowTag = true;
+            }
+        });
+                        
+        tabsContent += '</table></div>';                        
+    });
+       
+    tabs += "<li><a href=\"#add\" data-toggle=\"tab\">Tilføj</a></li>";
+    tabs += "<li class='active'><a href=\"#total\" data-toggle=\"tab\">Total</a></li>"; 
+                                    
+    //Create add tab
+    //createAddTab(tabs,data);
+                    
+    //Create total tab
+    tabsContent += '<div class="tab-pane active" id="total"><h2>Total</h2><table id="totalTable" class="table table-striped table-bordered table-hover">';
+    tabsContent += createTotalTabContent(data);
+    tabsContent += '<table></div>';
+       
+    $("#tabs-container").html(tabs);
+    $("#tab-content").html(tabsContent);
+});
+
+socket.on('error',function(data){
+    $(document.body).html('<div id="errorModal" class="modal hide fade"><div class="modal-header"><h3>Der er opstået en fejl..</h3></div><div class="modal-body"><p>Prøv at genopfriske siden. Hvis fejlen stadigt opstår, kontakt support.</p></div></div>');
+    
+    $('#errorModal').modal();
+});
+
+socket.on('newTotal',function(data){
+    $('#totalTable').html(createTotalTabContent(data));
+});
 
 
 function updateOrderItem(orderitem,orderId){
@@ -109,29 +116,29 @@ function updateOrderItem(orderitem,orderId){
             window.clearTimeout(updateOrderItem.lastTimeOutId);
         }
         updateOrderItem.lastTimeOutId = window.setTimeout(function(){
-            $.post('/order/updateOrderItem',
+            socket.emit('updateOrderItem',
             {
                 orderId: orderId, 
                 customer: orderitem.customer, 
                 type: orderitem.type, 
                 newValue: $(("#orderItemSpinner" + orderId + orderitem.customer + orderitem.type).replace(/\s/g,'')).val()
-            })
-            .error(function(jqXHR,textStatus, err){alert('Error: ' + err)});
+            });
             
             updateOrderItem.lastTimeOutId = -1;
         },100);                  
     });
 }
 
-function createTotalTab(data){
-    var tabsContent = "";    
+function createTotalTabContent(data){
+    var tabsContent = "";
     
-    tabsContent += '<div class="tab-pane active" id="total"><h2>Total</h2><table class="table table-striped table-bordered table-hover">';
-    
+    //Ensure the sort is done
+    data.forEach(function(order){
+        order.orderItems.sort(compare);
+    });
+        
     //First the headers
     tabsContent += '<thead><tr><th>Kunde & Type</th>';
-    
-    
     
     data.forEach(function(order){
         var date = new Date(order.date);
@@ -141,8 +148,7 @@ function createTotalTab(data){
     
     tabsContent += '<th>Total</th></thead></tr>';
     
-    //The build the actual table
-    
+    //Then build the actual table
     var currentCustomer = "";
     var currentType = "";
     var customers = [];
@@ -150,7 +156,7 @@ function createTotalTab(data){
     
     
     //Build the list of customers and types from the first orderItem
-    data[0].orderItems.forEach(function(orderItem){
+    data[0].orderItems.forEach(function(orderItem){    
         if($.inArray(orderItem.customer,customers) === -1){
             customers.push(orderItem.customer);
         }
@@ -159,8 +165,6 @@ function createTotalTab(data){
             types.push(orderItem.type);
         }
     });
-
-
 
     var amounts = {};
     var totals = {};
@@ -204,19 +208,5 @@ function createTotalTab(data){
         tabsContent += '</tr>';
     });
     
-    
-    
-    data.forEach(function(order){
-        
-    });
-    
-    
-    tabsContent += '<table></div>';
-    
     return tabsContent;
-}        
-        
-$(document).ready(function(){
-    updateOrders();
-});
-        
+}

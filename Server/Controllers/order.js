@@ -9,90 +9,80 @@ String.prototype.hashCode = function(){
 	return hash;
 }
 
-module.exports = {
-    action_getOrders: function(request,response){
-        // Retrieve
-        var MongoClient = require('mongodb').MongoClient;
+module.exports.getOrders = getOrders;
+function getOrders(socket,data){
+    // Retrieve
+    var MongoClient = require('mongodb').MongoClient;
 
-        // Connect to the db
-        MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
-            if(err) { console.log(err); response.writeHead(500); response.end(); db.close(); return;}
+    // Connect to the db
+    MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
+        if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
 
-            var collection = db.collection('orders');
-            
-            collection.find({}).toArray(function(err,result){
-                if(err) { console.log(err); response.writeHead(500); reponse.end(); db.close(); return;}
-                
-                response.writeHead(200, {'Content-Type': 'text/javascript'} );
-                
-                response.write(JSON.stringify(result));
+        var seasonCollection = db.collection('seasons');
         
-                response.end();
-            });
-        });
+        seasonCollection.findOne({'name': data.season},function(err,result){
+            if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
+            
+            var collection = db.collection('orders');
     
-    },
-    action_getOrdersHash: function(request,response){
-          // Retrieve
-        var MongoClient = require('mongodb').MongoClient;
-
-        // Connect to the db
-        MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
-            if(err) { console.log(err); response.writeHead(500); response.end(); db.close(); return;}
-
-            var collection = db.collection('orders');
+            collection.find({seasonId: result._id}).toArray(function(err,result){
+                if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
             
-            collection.find({}).toArray(function(err,result){
-                if(err) { console.log(err); response.writeHead(500); reponse.end(); db.close(); return;}
-                
-                response.writeHead(200, {'Content-Type': 'text/javascript'} );
-                
-                response.write(JSON.stringify(result).hashCode());
-        
-                response.end();
+                socket.emit('orders',result);
+                db.close();
             });
         });
-    },
-    action_updateOrderItem: function(request,response){
-            var qs = require('querystring');
+    });    
+}
+
+module.exports.getOrdersHash = getOrdersHash;
+function getOrdersHash(request,response){
+    // Retrieve
+    var MongoClient = require('mongodb').MongoClient;
+
+    // Connect to the db
+    MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
+        if(err) { console.log(err); response.writeHead(500); response.end(); db.close(); return;}
+
+        var collection = db.collection('orders');
+            
+        collection.find({}).toArray(function(err,result){
+            if(err) { console.log(err); response.writeHead(500); reponse.end(); db.close(); return;}
+                
+            response.writeHead(200, {'Content-Type': 'text/javascript'} );
+                
+            response.write(JSON.stringify(result).hashCode());
         
-            var body = '';
-            request.on('data', function (data) {
-                body += data;
-                
-                if (body.length > 1e6) {
-                    // FLOOD ATTACK OR FAULTY CLIENT, NUKE REQUEST
-                    response.writeHead(413);
-                    response.end();
-                    
-                    console.log('Flood attack prevented');
-                    
-                    request.connection.destroy();
-                }   
+            response.end();
+        });
+    });
+}
+
+module.exports.updateOrderItem = updateOrderItem;
+function updateOrderItem(socket,data){
+    // Retrieve
+    var MongoClient = require('mongodb').MongoClient;
+
+    // Connect to the db
+    MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
+        if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
+
+        var collection = db.collection('orders');
+            
+        console.log(data);
+        collection.update({'_id': parseInt(data.orderId), 'orderItems.type': data.type, 'orderItems.customer': data.customer},{$set: {'orderItems.$.amount': parseInt(data.newValue)}},function(err,count){
+            if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
+            
+            console.log('Elements updated: ' + count);
+            
+            collection.find({}).toArray(function(err,result){
+                if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
+
+                socket.emit('newTotal',result);
+                db.close();
             });
             
-            request.on('end', function () {
-                var data = qs.parse(body);
-                
-                // Retrieve
-                var MongoClient = require('mongodb').MongoClient;
 
-                // Connect to the db
-                MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
-                    if(err) { console.log(err); response.writeHead(500,err); response.end(); db.close(); return;}
-
-                    var collection = db.collection('orders');
-            
-                    console.log(data);
-                    collection.update({'_id': parseInt(data.orderId), 'orderItems.type': data.type, 'orderItems.customer': data.customer},{$set: {'orderItems.$.amount': parseInt(data.newValue)}},function(err,count){
-                        if(err) { console.log(err); response.writeHead(500); db.close(); reponse.end(); return;}
-                
-                        console.log('Elements updated: ' + count);
-                        response.writeHead(200);
-                        response.end();
-                        db.close();
-                    });
-                });
-            });
-    }
+        });
+    });
 }

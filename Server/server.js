@@ -1,66 +1,34 @@
-var util = require("util"),
-my_http = require("http");
-url = require('url');
-var static = require('node-static');
+//Node modules
+var express = require('express')
+  , app = express()
+  , http = require('http')
+  , server = http.createServer(app)
+  , io = require('socket.io').listen(server);
 
-var webroot = '../Client/',
-  port = 8080;
+//My own modules
+var order = require('./Controllers/order.js');
 
-//Lets try to get the controller/action thing going here
+//Configuration settings
+var webroot = '../Client/'
+  , port = 80;
 
-my_http.createServer(function(request,response){  
-    if (request.url === '/favicon.ico') {
-        response.writeHead(200, {'Content-Type': 'image/x-icon'} );
-        response.end();
-        console.log('favicon requested');
-        return;
-    }
-    
-    //response.writeHeader(200, {"Content-Type": "text/plain"});  
-    
-    var pathArray = (url.parse(request.url).pathname).split("/"); 
-    
-    var controllerName = pathArray[1];
-    var actionName = pathArray[2] !== undefined ? pathArray[2] : 'index';
-    var actionName = actionName !== "" ?  actionName : 'index';
-    
-    if(controllerName === 'Client'){
-        //Strip the /client from the request
-        
-        request.url = request.url.replace(/^\/Client/g,"");
-    
-        var file = new(static.Server)(webroot, {
-            cache: 600,
-            headers: { 'X-Powered-By': 'node-static' }
-        });    
-        
-        request.addListener('end', function() {
-            file.serve(request, response, function(err, result) {
-                if (err) {
-                    console.error('Error serving %s - %s', request.url, err.message);
-                    response.writeHead(err.status, err.headers);
-                    response.end();
-                } else {
-                    console.log('%s - %s', request.url, response.message);
-                }
-            });
-        });
-    } else {
-        util.log('Request for:');
-        util.log('Controller: ' + controllerName);
-        util.log('Action: ' + actionName);
-        
-        try{
-            var controller = require('./Controllers/' + pathArray[1]);
-        
-            controller['action_' + actionName](request,response);
-        } catch(err){
-            console.log("Error:", err);
-        
-            response.writeHead(404);
-            response.end();   
-        }
-    }
-}).listen(8080);  
+app.use(logErrors);
+app.use('/',express.static(__dirname + "/../Client"));
 
-util.puts("Server Running on 8080");
+function logErrors(err, req, res, next) {
+  console.error(err.stack);
+  next(err);
+}
+
+io.sockets.on('connection', function (socket) {
+    socket.on('updateOrders', function (data) {
+        order.getOrders(socket,data);
+    });
+    
+    socket.on('updateOrderItem',function(data){
+        order.updateOrderItem(socket,data);
+    });
+});
+
+server.listen(port);
+console.log("Server Running on " + port);
