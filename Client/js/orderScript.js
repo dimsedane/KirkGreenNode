@@ -17,8 +17,12 @@ function compare(item1,item2){
     }
 }
 
-var socket = io.connect('http://localhost');
 socket.emit('updateOrders',{'season':'2013'});
+socket.emit('login',{'name': 'Rune', 'password': "kodeord"});
+
+function deleteOrder(date){
+    socket.emit('deleteOrder',{date: date});
+}
 
 socket.on('orders',function(data){
     var tabs = "";
@@ -34,7 +38,7 @@ socket.on('orders',function(data){
         tabsContent += '<div class="tab-pane" id="'+order.date+'">';
                         
         //Lets add a header
-        tabsContent += '<h2>Bestillinger for ' + date.getDate() + '/' + date.getMonth() +'</h2>';
+        tabsContent += '<h2>Bestillinger for ' + date.getDate() + '/' + date.getMonth() +' <button onClick="deleteOrder('+ order.date +')" class="btn btn-danger btn-mini">Delete</button></h2>';
                         
         //Then the table
         tabsContent += '<table class="table table-striped">';
@@ -84,7 +88,7 @@ socket.on('orders',function(data){
     tabs += "<li class='active'><a href=\"#total\" data-toggle=\"tab\">Total</a></li>"; 
                                     
     //Create add tab
-    //createAddTab(tabs,data);
+    tabsContent += createAddTab(data);
                     
     //Create total tab
     tabsContent += '<div class="tab-pane active" id="total"><h2>Total</h2><table id="totalTable" class="table table-striped table-bordered table-hover">';
@@ -93,6 +97,11 @@ socket.on('orders',function(data){
        
     $("#tabs-container").html(tabs);
     $("#tab-content").html(tabsContent);
+    
+    $('.datepicker').datepicker({format: "dd/mm/yyyy"});
+    $('#createOrderForm').submit(function(){
+        socket.emit('createOrder',{date: $('.datepicker').val()})
+    });
 });
 
 socket.on('error',function(data){
@@ -105,6 +114,19 @@ socket.on('newTotal',function(data){
     $('#totalTable').html(createTotalTabContent(data));
 });
 
+function createAddTab(data){
+    var tabsContent = '<div class="tab-pane" id="add"><h2>Add a new date</h2>';
+    
+    tabsContent += '<form id="createOrderForm" action="#" class="form-inline"><fieldset><input class="datepicker" type="text" placeholder="Select a date"><button type="submit" class="btn">Add</button></fieldset></form>';
+    
+    tabsContent += '</div>';
+    
+    $(function() {
+        $('.datepicker').datepicker();
+    });
+    
+    return tabsContent;
+}
 
 function updateOrderItem(orderitem,orderId){
     if ( typeof updateOrderItem.lastTimeoutId == 'undefined' ) {

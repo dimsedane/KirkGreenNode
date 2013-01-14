@@ -1,88 +1,122 @@
-String.prototype.hashCode = function(){
-	var hash = 0;
-	if (this.length == 0) return hash;
-	for (i = 0; i < this.length; i++) {
-		char = this.charCodeAt(i);
-		hash = ((hash<<5)-hash)+char;
-		hash = hash & hash; // Convert to 32bit integer
-	}
-	return hash;
-}
+var database = require('../data.js');
 
 module.exports.getOrders = getOrders;
 function getOrders(socket,data){
-    // Retrieve
-    var MongoClient = require('mongodb').MongoClient;
-
-    // Connect to the db
-    MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
-        if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
-
-        var seasonCollection = db.collection('seasons');
+    if(socket.handshake.session.username === undefined || socket.handshake.session.username === null){
+        socket.emit('authError',{error:'You must be logged in to access this page.'});
         
-        seasonCollection.findOne({'name': data.season},function(err,result){
-            if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
-            
-            var collection = db.collection('orders');
+    } else {
+        database.Order.find({},function(err, orders){
+            if(err) { console.log(err); socket.emit('error',{'error': err}); return;}
     
-            collection.find({seasonId: result._id}).toArray(function(err,result){
-                if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
-            
-                socket.emit('orders',result);
-                db.close();
-            });
+            socket.emit('orders',orders);
         });
-    });    
+    }
 }
 
-module.exports.getOrdersHash = getOrdersHash;
-function getOrdersHash(request,response){
-    // Retrieve
-    var MongoClient = require('mongodb').MongoClient;
-
-    // Connect to the db
-    MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
-        if(err) { console.log(err); response.writeHead(500); response.end(); db.close(); return;}
-
-        var collection = db.collection('orders');
-            
-        collection.find({}).toArray(function(err,result){
-            if(err) { console.log(err); response.writeHead(500); reponse.end(); db.close(); return;}
-                
-            response.writeHead(200, {'Content-Type': 'text/javascript'} );
-                
-            response.write(JSON.stringify(result).hashCode());
+module.exports.deleteOrder = deleteOrder;
+function deleteOrder(socket,data){
+    if(socket.handshake.session.username === undefined || socket.handshake.session.username === null){
+        socket.emit('authError',{error:'You must be logged in to access this page.'});
+    } else {
+        if(data.date === undefined){
+            socket.emit('error',{error: "There was a problem with the request"});
+            return;
+        }
         
-            response.end();
+        database.Order.findOneAndRemove({date: data.date},function(err,order){
+            if(err) { console.log(err); socket.emit('error',{'error': err}); return;}
+            
+            database.Order.find({},function(err, orders){
+                if(err) { console.log(err); socket.emit('error',{'error': err}); return;}
+    
+                socket.emit('orders',orders);
+            });
         });
-    });
+    }
+}
+
+module.exports.createOrder = createOrder;
+function createOrder(socket,data){
+    if(socket.handshake.session.username === undefined || socket.handshake.session.username === null){
+        socket.emit('authError',{error:'You must be logged in to access this page.'});
+    } else {
+        if(data.date === undefined){
+            socket.emit('error',{error: "There was a problem with the request"});
+            return;
+        }
+        
+        var dateSplit = data.date.split('/');
+        
+        var day = dateSplit[0];
+        var month = dateSplit[1];
+        var year = dateSplit[2];
+        
+        var date = new Date(year, month, day, 0, 0, 0, 0);
+        
+        var order = new database.Order;
+        
+        order.date = date.getTime();
+        
+        order.orderItems[0] = new database.OrderItem;
+        order.orderItems[0].type = 'NGR';
+        order.orderItems[0].customer = "Fjerritslev Kirke";
+        order.orderItems[0].amount = 0;
+        
+        order.orderItems[1] = new database.OrderItem;
+        order.orderItems[1].type = 'NGR';
+        order.orderItems[1].customer = "Hjortdal Kirke";
+        order.orderItems[1].amount = 0;
+        
+        order.orderItems[2] = new database.OrderItem;
+        order.orderItems[2].type = 'NOB';
+        order.orderItems[2].customer = "Fjerritslev Kirke";
+        order.orderItems[2].amount = 0;
+        
+        order.orderItems[3] = new database.OrderItem;
+        order.orderItems[3].type = 'NOB';
+        order.orderItems[3].customer = "Hjortdal Kirke";
+        order.orderItems[3].amount = 0;
+        
+        order.save(function(err, order){
+            database.Order.find({},function(err, orders){
+                if(err) { console.log(err); socket.emit('error',{'error': err}); return;}
+    
+                socket.emit('orders',orders);
+            });
+        });
+    }
 }
 
 module.exports.updateOrderItem = updateOrderItem;
 function updateOrderItem(socket,data){
-    // Retrieve
-    var MongoClient = require('mongodb').MongoClient;
-
-    // Connect to the db
-    MongoClient.connect("mongodb://localhost:27017/kirkgreen", function(err, db) {
-        if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
-
-        var collection = db.collection('orders');
-            
-        console.log(data);
-        collection.update({'_id': parseInt(data.orderId), 'orderItems.type': data.type, 'orderItems.customer': data.customer},{$set: {'orderItems.$.amount': parseInt(data.newValue)}},function(err,count){
-            if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
-            
-            console.log('Elements updated: ' + count);
-            
-            collection.find({}).toArray(function(err,result){
-                if(err) { console.log(err); socket.emit('error',{'error': err}); db.close(); return;}
-
-                socket.emit('newTotal',result);
-                db.close();
+    if(socket.handshake.session.username === undefined || socket.handshake.session.username === null){
+        socket.emit('authError',{error:'You must be logged in to access this page.'});
+        
+    } else {
+        database.Order.findOne({'_id': data.orderId},function(err, order){
+            if(err) { console.log(err); socket.emit('error',{'error': err}); return;}
+        
+            var found = false;
+        
+            order.orderItems.forEach(function(orderItem){
+                if(orderItem.type == data.type && orderItem.customer == data.customer){
+                    orderItem.amount = data.newValue;
+                    found = true;
+                }
             });
-            
-
+        
+            if(found){
+                order.save(function(){
+                    database.Order.find({},function(err, orders){
+                        if(err) { console.log(err); socket.emit('error',{'error': err}); return;}
+        
+                        socket.emit('newTotal',orders);
+                    });
+                });
+            } else { 
+                socket.emit('error',"No orderitem was found matching the provided data");
+            }
         });
-    });
+    }
 }
