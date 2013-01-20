@@ -96,6 +96,47 @@ io.sockets.on('connection', function (socket) {
     });
 
 });
+var database = require('./data.js');
+
+app.get('/generate/rdf/',function(req,res){
+    database.Order.find({},function(err, orders){
+        if(err) { console.log(err); res.end(); return;}      
+        
+        var body = '';
+        
+        body += '<?xml version="1.0"?>';
+        body += '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:order="http://dimsedane.dk/order.rdfs#">';
+    
+        body += '<rdf:Description rdf:about="http://www.kirkgreen.dk/">'
+        
+        orders.forEach(function(order){
+           body += '<order:Order><rdf:Bag rdf:about="order://kirkgreen/';
+           body += order.date;
+           body += '">';
+            
+           order.orderItems.forEach(function(orderItem){
+              body += '<order:OrderItem><rdf:Description>';
+              body += '<order:Customer><rdf:Description rdf:about="customer://kirkgreen/';
+              body += orderItem.customer;
+              body += '"/></order:Customer>';
+              body += '<order:Type><rdf:Description rdf:about="type://kirkgreen/';
+              body += orderItem.type;
+              body += '"/></order:Type>';
+              body += '<order:Amount rdf:datatype="http://www.w3.org/2001/XMLSchema#int">';
+              body += orderItem.amount;
+              body += '</order:Amount>';
+              body += '</rdf:Description></order:OrderItem>'; 
+           });
+           body += '</rdf:Bag></order:Order>';
+        });
+        body += '</rdf:Description>';
+        body += '</rdf:RDF>';
+        
+        res.setHeader('Content-Type', 'text/xml');
+        res.setHeader('Content-Length', body.length);
+        res.end(body);
+    });
+});
 
 server.listen(port);
 console.log("Server Running on " + port);
