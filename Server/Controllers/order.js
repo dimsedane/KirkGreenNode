@@ -1,7 +1,28 @@
 var database = require('../data.js');
+var helpers = require('../helpers.js');
 
-module.exports.getOrders = getOrders;
+
+module.exports.init = function(socket){
+    socket.on('updateOrders', function (data) {
+        getOrders(socket,data);
+    });    
+        
+    socket.on('updateOrderItem',function(data){
+        updateOrderItem(socket,data);
+    });
+    
+    socket.on('createOrder',function(data){
+        createOrder(socket,data);
+    });
+    
+    socket.on('deleteOrder',function(data){
+        deleteOrder(socket,data);
+    });
+
+}
+
 function getOrders(socket,data){
+    if(!helpers.validateInput(data,{})){ socket.emit('error',{error: "There was an error with the request"}); return;}
     if(socket.handshake.session.username === undefined || socket.handshake.session.username === null){
         socket.emit('authError',{error:'You must be logged in to access this page.'});
         
@@ -14,16 +35,14 @@ function getOrders(socket,data){
     }
 }
 
-module.exports.deleteOrder = deleteOrder;
 function deleteOrder(socket,data){
+    if(!helpers.validateInput(data,{
+        date: "Required"
+    })){ socket.emit('error',{error: "There was an error with the request"}); return;}
+    
     if(socket.handshake.session.username === undefined || socket.handshake.session.username === null){
         socket.emit('authError',{error:'You must be logged in to access this page.'});
     } else {
-        if(data.date === undefined){
-            socket.emit('error',{error: "There was a problem with the request"});
-            return;
-        }
-        
         database.Order.findOneAndRemove({date: data.date},function(err,order){
             if(err) { console.log(err); socket.emit('error',{'error': err}); return;}
             
@@ -36,16 +55,14 @@ function deleteOrder(socket,data){
     }
 }
 
-module.exports.createOrder = createOrder;
 function createOrder(socket,data){
+    if(!helpers.validateInput(data,{
+        date: "Required"
+    })){ socket.emit('error',{error: "There was an error with the request"}); return;}
+
     if(socket.handshake.session.username === undefined || socket.handshake.session.username === null){
         socket.emit('authError',{error:'You must be logged in to access this page.'});
-    } else {
-        if(data.date === undefined){
-            socket.emit('error',{error: "There was a problem with the request"});
-            return;
-        }
-        
+    } else {        
         var dateSplit = data.date.split('/');
         
         var day = dateSplit[0];
@@ -88,8 +105,14 @@ function createOrder(socket,data){
     }
 }
 
-module.exports.updateOrderItem = updateOrderItem;
 function updateOrderItem(socket,data){
+    if(!helpers.validateInput(data,{
+        orderId: "Required",
+        type: "Required",
+        customer: "Required",
+        newValue: "Required"
+    })){ socket.emit('error',{error: "There was an error with the request"}); return;}
+    
     if(socket.handshake.session.username === undefined || socket.handshake.session.username === null){
         socket.emit('authError',{error:'You must be logged in to access this page.'});
         

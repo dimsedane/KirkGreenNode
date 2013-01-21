@@ -17,7 +17,7 @@ function compare(item1,item2){
     }
 }
 
-socket.emit('updateOrders',{'season':'2013'});
+socket.emit('updateOrders',{});
 socket.emit('login',{'name': 'Rune', 'password': "kodeord"});
 
 function deleteOrder(date){

@@ -62,39 +62,10 @@ function logErrors(err, req, res, next) {
 
 io.sockets.on('connection', function (socket) {
     //OrderController
-    socket.on('updateOrders', function (data) {
-        order.getOrders(socket,data);
-    });    
+    order.init(socket);
         
-    socket.on('updateOrderItem',function(data){
-        order.updateOrderItem(socket,data);
-    });
-    
-    socket.on('createOrder',function(data){
-        order.createOrder(socket,data);
-    });
-    
-    socket.on('deleteOrder',function(data){
-        order.deleteOrder(socket,data);
-    });
-    
     //UserController
-    socket.on('createUser',function(data){
-        user.createUser(socket,data);
-    });
-    
-    socket.on('login', function(data){
-        user.login(socket,data); 
-    });
-    
-    socket.on('getUser', function(data){
-        user.getUser(socket,data);
-    });
-    
-    socket.on('logout',function(data){
-       user.logout(socket,data); 
-    });
-
+    user.init(socket);
 });
 
 server.listen(port);
