@@ -52,7 +52,6 @@ function logout(socket,data){
     //Ensure data is correctly formatted
     if(!helpers.validateInput(data,{})){ socket.emit('error',{error: "There was an error with the request"}); return;}
     delete socket.handshake.session.username;
-    console.log(socket.handshake.session);
     socket.emit('userUpdated',{});
 }
 
