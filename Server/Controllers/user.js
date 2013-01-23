@@ -52,11 +52,12 @@ function logout(socket,data){
     //Ensure data is correctly formatted
     if(!helpers.validateInput(data,{})){ socket.emit('error',{error: "There was an error with the request"}); return;}
     delete socket.handshake.session.username;
+    socket.handshake.session.touch().save();
     socket.emit('userUpdated',{});
+    socket.emit('logoutComplete',{});
 }
 
 function createUser(socket,data){
-    //Ensure data is correctly formatted
     //Ensure data is correctly formatted
     if(!helpers.validateInput(data,{
         name: "Required",
@@ -90,7 +91,7 @@ function createUser(socket,data){
     });
 }
 
-function getUser(socket,data,session){
+function getUser(socket,data){
     //Ensure data is correctly formatted
     if(!helpers.validateInput(data,{})){ socket.emit('error',{error: "There was an error with the request"}); return;}
     socket.emit('userUpdated',{username: socket.handshake.session.username});
